@@ -10,25 +10,13 @@ public class LockFreeBSTRTTI
 	static final AtomicReferenceFieldUpdater<Node, Node> lUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node.class, "lChild");
 	static final AtomicReferenceFieldUpdater<Node, Node> rUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node.class, "rChild");
 
-	//	static final AtomicReferenceFieldUpdater<Node, Node0F0M> l0F0MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node0F0M.class, "lChild");
-	//	static final AtomicReferenceFieldUpdater<Node, Node0F1M> l0F1MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node0F1M.class, "lChild");
-	//	static final AtomicReferenceFieldUpdater<Node, Node1F0M> l1F0MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node1F0M.class, "lChild");
-	//	static final AtomicReferenceFieldUpdater<Node, Node1F1M> l1F1MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node1F1M.class, "lChild");
-	//
-	//	static final AtomicReferenceFieldUpdater<Node, Node0F0M> r0F0MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node0F0M.class, "rChild");
-	//	static final AtomicReferenceFieldUpdater<Node, Node0F1M> r0F1MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node0F1M.class, "rChild");
-	//	static final AtomicReferenceFieldUpdater<Node, Node1F0M> r1F0MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node1F0M.class, "rChild");
-	//	static final AtomicReferenceFieldUpdater<Node, Node1F1M> r1F1MUpdate = AtomicReferenceFieldUpdater.newUpdater(Node.class, Node1F1M.class, "rChild");
-
-
-
 	public LockFreeBSTRTTI()
 	{
 	}
 
 	public final long lookup(long target)
 	{
-		
+
 		Node node = grandParentHead;
 		while(node.lChild != null) //loop until a leaf or dummy node is reached
 		{
@@ -109,28 +97,8 @@ public class LockFreeBSTRTTI
 				else
 				{
 					s = seek(insertKey);
-					cleanUp(insertKey,s);
+					cleanUp(insertKey,s, threadId);
 				}
-
-
-//				if(node.getClass() == Node0F0M.class && lUpdate.compareAndSet(pnode, node, internalNode))
-//				{
-//					//System.out.println("I3 " + insertKey);
-//					return;
-//				}
-//				else
-//				{
-//
-//					//insert failed; help the conflicting delete operation
-//					//System.out.println("1 " + insertKey + " " + node + " " + " " + pnode.lChild + " " + internalNode);	
-//					if(pnode.lChild.getClass() != Node0F0M.class) // address has not changed. So CAS would have failed coz of flag/mark only
-//					{
-//						//System.out.println("2 " + insertKey);
-//						//help other thread with cleanup
-//						s = seek(insertKey);
-//						cleanUp(insertKey,s);
-//					}
-//				}
 			}
 			else
 			{
@@ -144,30 +112,9 @@ public class LockFreeBSTRTTI
 				else
 				{
 					s = seek(insertKey);
-					cleanUp(insertKey,s);
+					cleanUp(insertKey,s, threadId);
 				}
-				
-//				if(node.getClass() == Node0F0M.class && rUpdate.compareAndSet(pnode, node, internalNode))
-//				{
-//					//System.out.println("I4 " + insertKey);
-//					return;
-//				}
-//				else
-//				{
-//					//insert failed; help the conflicting delete operation
-//					//System.out.println("3 " + insertKey + " " + node + " " + " " + pnode.rChild + " " + internalNode);	
-//
-//					//if(node == pnode.rChild) // address has not changed. So CAS would have failed coz of flag/mark only
-//					if(pnode.rChild.getClass() != Node0F0M.class) // address has not changed. So CAS would have failed coz of flag/mark only
-//					{
-//						//System.out.println("4 " + insertKey);
-//						//help other thread with cleanup
-//						s = seek(insertKey);
-//						cleanUp(insertKey,s);
-//					}
-//				}
 			}
-			//System.out.print(".");
 		}
 	}
 
@@ -196,45 +143,45 @@ public class LockFreeBSTRTTI
 						tempFlaggedNode = new Node1F0M(leaf.key,leaf.value, threadId);
 						tempFlaggedNode.lChild = leaf.lChild;
 						tempFlaggedNode.rChild = leaf.rChild;
-						if(leaf.getClass() == Node0F0M.class && lUpdate.compareAndSet(parent, leaf, tempFlaggedNode)) //00 to 10 - just flag
+						if(leaf.getClass() == Node0F0M.class ) 
 						{
-							isCleanUp = true;
-							//do cleanup
-							if(cleanUp(deleteKey,s))
+							if(lUpdate.compareAndSet(parent, leaf, tempFlaggedNode)) //00 to 10 - just flag
 							{
-								return;
+								isCleanUp = true;
+								//do cleanup
+								if(cleanUp(deleteKey,s, threadId))
+								{
+									return;
+								}
 							}
 						}
 						else
 						{
-							if(parent.lChild.getClass() != Node0F0M.class) // address has not changed. So CAS would have failed coz of flag/mark only
-							{
-								//help other thread with cleanup
-								cleanUp(deleteKey,s);
-							}
+							//help other thread with cleanup
+							cleanUp(deleteKey,s, threadId);
 						}
 					}
 					else
 					{
-						tempFlaggedNode = new Node1F0M(leaf.key,leaf.value);
-						tempFlaggedNode.lChild = leaf.lChild;
-						tempFlaggedNode.rChild = leaf.rChild;
-						if(leaf.getClass() == Node0F0M.class && rUpdate.compareAndSet(parent, leaf, tempFlaggedNode)) //00 to 10 - just flag
+						tempFlaggedNode = new Node1F0M(leaf.key,leaf.value, threadId);
+						//						tempFlaggedNode.lChild = leaf.lChild;
+						//						tempFlaggedNode.rChild = leaf.rChild;
+						if(leaf.getClass() == Node0F0M.class) 
 						{
-							isCleanUp = true;
-							//do cleanup
-							if(cleanUp(deleteKey,s))
+							if(rUpdate.compareAndSet(parent, leaf, tempFlaggedNode)) //00 to 10 - just flag)
 							{
-								return;
+								isCleanUp = true;
+								//do cleanup
+								if(cleanUp(deleteKey,s, threadId))
+								{
+									return;
+								}
 							}
 						}
 						else
 						{
-							if(parent.rChild.getClass() != Node0F0M.class) // address has not changed. So CAS would have failed coz of flag/mark only
-							{
-								//help other thread with cleanup
-								cleanUp(deleteKey,s);
-							}
+							//help other thread with cleanup
+							cleanUp(deleteKey,s, threadId);
 						}
 					}
 				}
@@ -246,7 +193,7 @@ public class LockFreeBSTRTTI
 				if(s.leaf == leaf)
 				{
 					//do cleanup
-					if(cleanUp(deleteKey,s))
+					if(cleanUp(deleteKey,s, threadId))
 					{
 						return;
 					}
@@ -256,18 +203,18 @@ public class LockFreeBSTRTTI
 					//someone helped with my cleanup. So I'm done
 					return;
 				}
-				//System.out.println("Del5");
 			}
 		}
 	}
 
-	public final boolean cleanUp(long key, SeekRecord s)
+	public final boolean cleanUp(long key, SeekRecord s, int threadId)
 	{
 		Node ancestor = s.ancestor;
 		Node parent = s.parent;
 		Node oldSuccessor;
-		Node sibling;
+		Node sibling,oldSibling;
 		Node tempTaggedNode,tempUnTaggedNode;
+		boolean ok=false;
 
 		if(key < parent.key) //xl case
 		{
@@ -276,32 +223,36 @@ public class LockFreeBSTRTTI
 			{
 				//leaf node is flagged for deletion. tag the sibling edge to prevent any modification at this edge now
 				sibling = parent.rChild;
+				oldSibling = parent.rChild;
 				if(sibling.getClass().getName() == "Node0F0M")
 				{
-					tempTaggedNode = new Node0F1M(sibling.key, sibling.value);
+					tempTaggedNode = new Node0F1M(sibling.key, sibling.value, threadId);
 					tempTaggedNode.lChild = sibling.lChild;
 					tempTaggedNode.rChild = sibling.rChild;
 					rUpdate.compareAndSet(parent, sibling, tempTaggedNode);
 				}
 				else if(sibling.getClass().getName() == "Node1F0M")
 				{
-					tempTaggedNode = new Node1F1M(sibling.key, sibling.value);
+					tempTaggedNode = new Node1F1M(sibling.key, sibling.value, threadId);
 					tempTaggedNode.lChild = sibling.lChild;
 					tempTaggedNode.rChild = sibling.rChild;
 					rUpdate.compareAndSet(parent, sibling, tempTaggedNode);
 				}
+				sibling = parent.rChild;
 			}
 			else
 			{				
 				//leaf node is not flagged. So sibling node must have been flagged for deletion	
 				sibling = parent.lChild;
+				oldSibling = parent.lChild;
 				if(sibling.getClass().getName() == "Node0F0M") 
 				{
-					tempTaggedNode = new Node0F1M(sibling.key, sibling.value);
+					tempTaggedNode = new Node0F1M(sibling.key, sibling.value, threadId);
 					tempTaggedNode.lChild = sibling.lChild;
 					tempTaggedNode.rChild = sibling.rChild;
 					lUpdate.compareAndSet(parent, sibling, tempTaggedNode);
 				}
+				sibling = parent.lChild;
 			}		
 		}
 		else //xr case
@@ -310,32 +261,36 @@ public class LockFreeBSTRTTI
 			{
 				//leaf node is flagged for deletion. tag the sibling edge to prevent any modification at this edge now
 				sibling = parent.lChild;
+				oldSibling = parent.lChild;
 				if(sibling.getClass().getName() == "Node0F0M")
 				{
-					tempTaggedNode = new Node0F1M(sibling.key, sibling.value);
+					tempTaggedNode = new Node0F1M(sibling.key, sibling.value, threadId);
 					tempTaggedNode.lChild = sibling.lChild;
 					tempTaggedNode.rChild = sibling.rChild;
 					lUpdate.compareAndSet(parent, sibling, tempTaggedNode);
 				}
 				else if(sibling.getClass().getName() == "Node1F0M")
 				{
-					tempTaggedNode = new Node1F1M(sibling.key, sibling.value);
+					tempTaggedNode = new Node1F1M(sibling.key, sibling.value, threadId);
 					tempTaggedNode.lChild = sibling.lChild;
 					tempTaggedNode.rChild = sibling.rChild;
 					lUpdate.compareAndSet(parent, sibling, tempTaggedNode);
 				}
+				sibling = parent.lChild;
 			}
 			else
 			{				
 				//leaf node is not flagged. So sibling node must have been flagged for deletion	
 				sibling = parent.rChild;
+				oldSibling = parent.rChild;
 				if(sibling.getClass().getName() == "Node0F0M") 
 				{
-					tempTaggedNode = new Node0F1M(sibling.key, sibling.value);
+					tempTaggedNode = new Node0F1M(sibling.key, sibling.value, threadId);
 					tempTaggedNode.lChild = sibling.lChild;
 					tempTaggedNode.rChild = sibling.rChild;
 					rUpdate.compareAndSet(parent, sibling, tempTaggedNode);
 				}
+				sibling = parent.rChild;
 			}		
 		}
 
@@ -346,14 +301,25 @@ public class LockFreeBSTRTTI
 			//copy only the flag	
 			if(sibling.getClass().getName() == "Node1F0M" || sibling.getClass().getName() == "Node0F0M" )
 			{
-				return(lUpdate.compareAndSet(ancestor, oldSuccessor, sibling));
+				//return(lUpdate.compareAndSet(ancestor, oldSuccessor, sibling));
+				return(false); //tagging the sibling in the previous step failed. So restart
 			}
 			else
 			{
-				tempUnTaggedNode = new Node0F0M(sibling.key,sibling.value);
-				tempUnTaggedNode.lChild = sibling.lChild;
-				tempUnTaggedNode.rChild = sibling.rChild;
-				return(lUpdate.compareAndSet(ancestor, oldSuccessor, tempUnTaggedNode));
+				if(sibling.getClass().getName() == "Node1F1M")
+				{
+					tempUnTaggedNode = new Node1F0M(sibling.key,sibling.value, threadId);
+					tempUnTaggedNode.lChild = sibling.lChild;
+					tempUnTaggedNode.rChild = sibling.rChild;
+					return(lUpdate.compareAndSet(ancestor, oldSuccessor, tempUnTaggedNode));
+				}
+				else //Node0F1M
+				{
+					tempUnTaggedNode = new Node0F0M(sibling.key,sibling.value, threadId);
+					tempUnTaggedNode.lChild = sibling.lChild;
+					tempUnTaggedNode.rChild = sibling.rChild;
+					return(lUpdate.compareAndSet(ancestor, oldSuccessor, tempUnTaggedNode));
+				}
 
 			}
 		}
@@ -363,15 +329,25 @@ public class LockFreeBSTRTTI
 			oldSuccessor = ancestor.rChild;
 			if(sibling.getClass().getName() == "Node1F0M" || sibling.getClass().getName() == "Node0F0M" )
 			{
-				return(rUpdate.compareAndSet(ancestor, oldSuccessor, sibling));
+				//return(rUpdate.compareAndSet(ancestor, oldSuccessor, sibling));
+				return(false); //tagging the sibling in the previous step failed. So restart
 			}
 			else
 			{
-				tempUnTaggedNode = new Node0F0M(sibling.key,sibling.value);
-				tempUnTaggedNode.lChild = sibling.lChild;
-				tempUnTaggedNode.rChild = sibling.rChild;
-				return(rUpdate.compareAndSet(ancestor, oldSuccessor, tempUnTaggedNode));
-
+				if(sibling.getClass().getName() == "Node1F1M")
+				{
+					tempUnTaggedNode = new Node1F0M(sibling.key,sibling.value, threadId);
+					tempUnTaggedNode.lChild = sibling.lChild;
+					tempUnTaggedNode.rChild = sibling.rChild;
+					return(rUpdate.compareAndSet(ancestor, oldSuccessor, tempUnTaggedNode));
+				}
+				else //Node0F1M
+				{
+					tempUnTaggedNode = new Node0F0M(sibling.key,sibling.value, threadId);
+					tempUnTaggedNode.lChild = sibling.lChild;
+					tempUnTaggedNode.rChild = sibling.rChild;
+					return(rUpdate.compareAndSet(ancestor, oldSuccessor, tempUnTaggedNode));
+				}
 			}
 		}
 	}
