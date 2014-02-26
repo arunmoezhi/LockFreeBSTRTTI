@@ -190,7 +190,7 @@ public class LockFreeBSTRTTI
 			{
 				//in the cleanup phase
 				//check if leaf is still present in the tree. If nobody has helped with the clean up old leaf will be still hanging. So remove it
-				if(s.leaf == leaf)
+				if(s.leaf.threadId == leaf.threadId)
 				{
 					//do cleanup
 					if(cleanUp(deleteKey,s, threadId))
